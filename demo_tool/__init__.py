@@ -8,6 +8,8 @@ import signal
 exit_flag = False
 def signal_handler(signal, frame):
     global exit_flag
+    if exit_flag:
+        sys.exit(1)
     exit_flag = True
     print('In signal_handler')
 

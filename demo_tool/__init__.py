@@ -1,6 +1,7 @@
 
 SHARED_DEMO_FOLDER = r'S:\Support\IT\IT Shared Documents\SharedDemos'
 
+from inspect import trace
 import os
 import sys
 import subprocess
@@ -63,11 +64,29 @@ def main(args=sys.argv):
         else:
             print('Appending...') # Default behavior
 
+    if 'win' in str(sys.platform).lower():
+        desktop_container = av.open('desktop', format='gdigrab')
+    else:
+        desktop_container = av.open(':0.0', format='x11grab')
+
+    print(f'desktop_container.streams.video[0] = {desktop_container.streams.video[0].codec_context}')
+
+    video_out_container = av.open(demo_video_f)
+    
+    video_out_stream = video_out_container.add_stream('libx264', rate=30, options={"crf":"23"})
     
     while not exit_flag:
-        time.sleep(0.5)
-        print('Doing work...')
+        # Process like one frame
+        try:
+            frame = next(desktop_container.decode(video=0))
 
+            video_out_container.mux(video_out_stream.encode(frame))
+
+        except:
+            traceback.print_exc()
+            time.sleep(1.5)
+
+    video_out_container.close()
 
     print(f'Opening {demo_dir}')
     os.startfile(os.path.realpath(demo_dir))

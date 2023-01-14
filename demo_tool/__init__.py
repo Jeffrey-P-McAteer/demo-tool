@@ -1,6 +1,4 @@
 
-SHARED_DEMO_FOLDER = r'S:\Support\IT\IT Shared Documents\SharedDemos'
-
 from inspect import trace
 import os
 import sys
@@ -19,6 +17,11 @@ except:
         sys.executable, *('-m pip install --user av'.split())
     ], check=False)
     import av
+
+
+SHARED_DEMO_FOLDER = r'S:\Support\IT\IT Shared Documents\SharedDemos'
+if not 'win' in str(sys.platform).lower():
+    SHARED_DEMO_FOLDER = '/tmp/SharedDemos'
 
 
 exit_flag = False
@@ -69,27 +72,64 @@ def main(args=sys.argv):
     else:
         desktop_container = av.open(':0.0', format='x11grab')
 
-    print(f'desktop_container.streams.video[0] = {desktop_container.streams.video[0].codec_context}')
+    # desktop_stream = desktop_container.streams.video[0]
+    # print(f'desktop_stream={desktop_stream}')
 
-    video_out_container = av.open(demo_video_f)
-    
-    video_out_stream = video_out_container.add_stream('libx264', rate=30, options={"crf":"23"})
+    video_out_fps = desktop_container.streams.video[0].codec_context.framerate
+    video_out_size = (
+        desktop_container.streams.video[0].codec_context.width,
+        desktop_container.streams.video[0].codec_context.height
+    )
+    print(f'video_out_size={video_out_size} video_out_fps={video_out_fps} demo_video_f={demo_video_f}')
+
+    if not os.path.exists(demo_video_f):
+        video_out_container = av.open(demo_video_f, 'w')
+        video_out_stream = video_out_container.add_stream(
+            'libx264', rate=video_out_fps,
+            options={"crf":"23", }
+        )
+        video_out_stream.codec_context.width = video_out_size[0]
+        video_out_stream.codec_context.height = video_out_size[1]
+    else:
+        video_out_container = av.open(demo_video_f, 'w')
+        try:
+            video_out_stream = video_out_container.streams.video[0]
+        except:
+            traceback.print_exc()
+            video_out_stream = video_out_container.add_stream(
+                'libx264', rate=video_out_fps,
+                options={"crf":"23", }
+            )
+            video_out_stream.codec_context.width = video_out_size[0]
+            video_out_stream.codec_context.height = video_out_size[1]
+
+
+    print(f'video_out_container={video_out_container} video_out_stream={video_out_stream}')
     
     while not exit_flag:
         # Process like one frame
+        print(f'while not {exit_flag}')
         try:
-            frame = next(desktop_container.decode(video=0))
-
-            video_out_container.mux(video_out_stream.encode(frame))
+            for frame in desktop_container.decode(video=0):
+                video_out_container.mux(video_out_stream.encode(frame))
+                if not exit_flag:
+                    break # This also halts timestamps, apparently.
 
         except:
             traceback.print_exc()
             time.sleep(1.5)
 
-    video_out_container.close()
-
+    try:
+        video_out_container.close()
+    except:
+        traceback.print_exc()
+    
     print(f'Opening {demo_dir}')
-    os.startfile(os.path.realpath(demo_dir))
+    print(f'Play {demo_video_f}')
+    try:
+        os.startfile(os.path.realpath(demo_dir))
+    except:
+        pass
 
 
 
